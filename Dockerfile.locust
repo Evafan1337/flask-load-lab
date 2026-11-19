@@ -1,0 +1,12 @@
+FROM python:3.13-slim
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 LAB_METRICS_HOST=0.0.0.0 LAB_TARGET_HOST=http://flask:5000
+WORKDIR /srv/flask-load-lab
+COPY requirements.txt requirements-load.txt requirements-lock.txt ./
+RUN pip install --no-cache-dir -r requirements-load.txt -c requirements-lock.txt \
+    && useradd --create-home --uid 10001 lab
+COPY load_tests ./load_tests
+RUN mkdir reports && chown lab:lab reports
+USER lab
+EXPOSE 8089 9646
+ENTRYPOINT ["locust", "-f", "load_tests/locustfile.py", "--host", "http://flask:5000"]
+CMD ["--web-host", "0.0.0.0", "--web-port", "8089"]

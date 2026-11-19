@@ -1,0 +1,61 @@
+name: flask-load-lab
+services:
+  flask:
+    build: .
+    ports: ["127.0.0.1:5000:5000"]
+    restart: unless-stopped
+  locust:
+    build:
+      context: .
+      dockerfile: Dockerfile.locust
+    ports: ["127.0.0.1:8089:8089"]
+    depends_on:
+      flask:
+        condition: service_healthy
+    restart: unless-stopped
+  prometheus:
+    image: prom/prometheus:v3.16.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+      - --storage.tsdb.retention.size=1GB
+      - --web.listen-address=0.0.0.0:9090
+    ports: ["127.0.0.1:9090:9090"]
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    depends_on: [flask, locust]
+    restart: unless-stopped
+  grafana:
+    image: grafana/grafana:13.3.1
+    ports: ["127.0.0.1:3000:3000"]
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-local-training-only}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_PLUGINS_PREINSTALL_DISABLED: "true"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/flask-load-lab.json
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on: [prometheus]
+    restart: unless-stopped
+  loadtest:
+    profiles: [reports]
+    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
+    build:
+      context: .
+      dockerfile: Dockerfile.locust
+    depends_on:
+      flask:
+        condition: service_healthy
+    command: ["--headless", "--lab-scenario", "mixed", "-u", "10", "-r", "2", "-t", "60s", "--csv", "/srv/flask-load-lab/reports/docker-mixed", "--html", "/srv/flask-load-lab/reports/docker-mixed.html", "--exit-code-on-error", "0"]
+    volumes:
+      - ./reports:/srv/flask-load-lab/reports
+volumes:
+  prometheus-data:
+  grafana-data:

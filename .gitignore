@@ -1,0 +1,10 @@
+.venv/
+.runtime/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.env
+reports/*
+!reports/README.md
+.DS_Store
+Thumbs.db

@@ -1,0 +1,12 @@
+.git
+.venv
+.runtime
+runtime
+data
+logs
+reports
+work
+__pycache__
+.pytest_cache
+*.pyc
+tests
