@@ -15,3 +15,14 @@ jobs:
       - run: python -m pytest -q
       - run: docker compose config --quiet
       - run: docker run --rm --entrypoint promtool -v "$PWD/observability:/config:ro" prom/prometheus:v3.16.0 check config /config/prometheus.yml
+      - name: Start the default lab
+        run: docker compose up --build -d --wait
+      - name: Run the JMeter smoke plan
+        run: LOCAL_UID="$(id -u)" LOCAL_GID="$(id -g)" docker compose run --rm --build jmeter smoke
+      - name: Check the Grafana dashboard and Prometheus
+        run: |
+          curl --fail --retry 12 --retry-all-errors --retry-delay 2 http://127.0.0.1:3000/api/health
+          python scripts/check_lab.py
+      - name: Stop the lab
+        if: always()
+        run: docker compose down

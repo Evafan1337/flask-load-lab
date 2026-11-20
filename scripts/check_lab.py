@@ -18,23 +18,27 @@ def get_json(url):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--require-data", action="store_true", help="Also fail when a query returns no series (run during a test).")
+    parser.add_argument("--with-locust", action="store_true", help="Check the optional Locust service and dashboard too.")
     args = parser.parse_args()
     report = {"checked_utc": datetime.now(timezone.utc).isoformat(), "checks": []}
     errors = []
     checks = report["checks"]
-    for name, url in (
+    services = [
         ("flask", "http://127.0.0.1:5000/health"),
-        ("locust", "http://127.0.0.1:8089/stats/requests"),
         ("grafana", "http://127.0.0.1:3000/api/health"),
         ("datasource", "http://127.0.0.1:3000/api/datasources/uid/prometheus/health"),
-    ):
+    ]
+    if args.with_locust:
+        services.append(("locust", "http://127.0.0.1:8089/stats/requests"))
+    for name, url in services:
         result = get_json(url)
         if name == "datasource" and result.get("status") != "OK":
             errors.append(f"Grafana datasource: {result}")
         checks.append({"service": name, "http": 200})
 
     targets = get_json("http://127.0.0.1:9090/api/v1/targets")["data"]["activeTargets"]
-    for job in ("flask", "locust"):
+    jobs = ("flask", "locust") if args.with_locust else ("flask",)
+    for job in jobs:
         matches = [target for target in targets if target["labels"].get("job") == job]
         if not matches or any(target["health"] != "up" for target in matches):
             errors.append(f"Prometheus target {job} is not UP")
@@ -43,6 +47,8 @@ def main():
     with_data = 0
     for path in sorted((ROOT / "observability/grafana/dashboards").glob("*.json")):
         dashboard = json.loads(path.read_text(encoding="utf-8"))
+        if not args.with_locust and dashboard["uid"] == "load-generator":
+            continue
         live = get_json(f"http://127.0.0.1:3000/api/dashboards/uid/{dashboard['uid']}")
         if not live.get("meta", {}).get("provisioned"):
             errors.append(f"Dashboard {dashboard['uid']} is not provisioned")

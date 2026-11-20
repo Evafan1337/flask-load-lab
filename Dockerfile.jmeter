@@ -1,0 +1,13 @@
+FROM eclipse-temurin:17-jre-jammy
+
+RUN (curl -fsSL --connect-timeout 15 https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-5.6.3.tgz -o /tmp/jmeter.tgz \
+    || curl -fsSL --connect-timeout 15 https://dlcdn.apache.org/jmeter/binaries/apache-jmeter-5.6.3.tgz -o /tmp/jmeter.tgz) \
+    && echo '5978a1a35edb5a7d428e270564ff49d2b1b257a65e17a759d259a9283fc17093e522fe46f474a043864aea6910683486340706d745fcdf3db1505fd71e689083  /tmp/jmeter.tgz' | sha512sum -c - \
+    && tar -xzf /tmp/jmeter.tgz -C /opt \
+    && rm /tmp/jmeter.tgz
+
+COPY scripts/run-jmeter.sh /usr/local/bin/run-jmeter
+ENV PATH="/opt/apache-jmeter-5.6.3/bin:${PATH}"
+WORKDIR /tmp
+ENTRYPOINT ["/bin/sh", "/usr/local/bin/run-jmeter"]
+CMD ["smoke"]

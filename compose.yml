@@ -5,6 +5,7 @@ services:
     ports: ["127.0.0.1:5000:5000"]
     restart: unless-stopped
   locust:
+    profiles: [locust]
     build:
       context: .
       dockerfile: Dockerfile.locust
@@ -24,7 +25,7 @@ services:
     volumes:
       - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
-    depends_on: [flask, locust]
+    depends_on: [flask]
     restart: unless-stopped
   grafana:
     image: grafana/grafana:13.3.1
@@ -56,6 +57,18 @@ services:
     command: ["--headless", "--lab-scenario", "mixed", "-u", "10", "-r", "2", "-t", "60s", "--csv", "/srv/flask-load-lab/reports/docker-mixed", "--html", "/srv/flask-load-lab/reports/docker-mixed.html", "--exit-code-on-error", "0"]
     volumes:
       - ./reports:/srv/flask-load-lab/reports
+  jmeter:
+    profiles: [jmeter]
+    build:
+      context: .
+      dockerfile: Dockerfile.jmeter
+    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
+    depends_on:
+      flask:
+        condition: service_healthy
+    volumes:
+      - ./jmeter:/plans:ro
+      - ./reports:/reports
 volumes:
   prometheus-data:
   grafana-data:

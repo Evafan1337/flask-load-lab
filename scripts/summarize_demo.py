@@ -16,17 +16,17 @@ def main():
     samara = timezone(timedelta(hours=4))
     local_start, local_end = start.astimezone(samara), end.astimezone(samara)
     lines = [
-        "# Проверенная демонстрация",
+        "# Результаты демонстрации Locust",
         "",
         f"Реальные прогоны {local_start:%d.%m.%Y}, {local_start:%H:%M:%S}–{local_end:%H:%M:%S} (Самара, UTC+4).",
-        "Все компоненты работали на одном компьютере в Windows. Это учебное сравнение, а не универсальный benchmark Flask.",
+        "Все компоненты работали на одном компьютере в Windows.",
         "",
         "| Сценарий | Пользователи | Длительность | Запросы | Ошибки | Среднее, мс | p95, мс | RPS |",
         "|---|---:|---|---:|---:|---:|---:|---:|",
     ]
     for run in runs:
         row = run["summary"]
-        failure_pct = 100 * row["failures"] / row["requests"]
+        failure_pct = 100 * row["failures"] / row["requests"] if row["requests"] else 0
         lines.append(f"| {row['scenario']} | {row['users']} | {row['duration']} | {row['requests']} | {row['failures']} ({failure_pct:.1f}%) | {row['mean_ms']:.2f} | {row['p95_ms']:g} | {row['rps']:.2f} |")
     lines += [
         "",
@@ -37,7 +37,7 @@ def main():
         f"- [Grafana: Flask — все три прогона](http://127.0.0.1:3000/d/flask-load-lab?from={from_ms}&to={to_ms})",
         f"- [Grafana: Locust — все три прогона](http://127.0.0.1:3000/d/load-generator?from={from_ms}&to={to_ms}&var-generator=locust_headless)",
         "",
-        "Ссылки фиксируют время тестов и подходят для показа после остановки нагрузки. Нужны работающие Grafana и Prometheus с данными этой локальной установки; хранение — до 7 дней, с ограничением 1 ГБ. После перезапуска выполните `scripts/Start-Lab.ps1`. В свежем клоне или на другом компьютере выполните `scripts/Run-Demo.ps1`, чтобы получить свои данные и обновить этот файл.",
+        "Ссылки открывают выбранный интервал в Grafana на компьютере с данными этого прогона.",
         "",
         "## Отчёты",
         "",
@@ -46,23 +46,9 @@ def main():
         # Only the report directory name is shared; do not embed a user's absolute path.
         folder = run["folder"].replace("\\", "/").rstrip("/").rsplit("/", 1)[-1]
         label = run["summary"]["scenario"]
-        lines.append(f"- {label}: [HTML](reports/{folder}/report.html), [параметры и результат](reports/{folder}/run.json), CSV в той же папке.")
-    lines += [
-        "",
-        "HTML/CSV доступны в установленной копии и отдельном архиве отчётов. Они исключены из Git. Для нового урока: [практикум](docs/lesson.md).",
-        "",
-        "## Проверка комплекта",
-        "",
-        "- 23 теста приложения и контракта метрик прошли.",
-        "- Два provisioned dashboard по 13 панелей; 30 из 30 PromQL-запросов выполняются и возвращают серии во время нагрузки.",
-        "- Grafana datasource health — OK; нативный запуск, повторный запуск и сохранение истории проверены.",
-        "- Синтаксис Compose и конфигурация Prometheus проверены. Docker Engine не был запущен, поэтому контейнерный вариант не проверен в работе.",
-        "- Визуальный просмотр встроенным браузером был заблокирован разрешениями localhost; страницы и конфигурация проверены через локальные API.",
-        "- GitHub: подготовлен локальный репозиторий, публикация не выполнялась.",
-        "",
-    ]
-    output = ROOT / "DEMO-RESULTS.md"
-    output.write_text("\n".join(lines), encoding="utf-8")
+        lines.append(f"- {label}: [HTML]({folder}/report.html), [параметры и результат]({folder}/run.json), CSV в той же папке.")
+    output = ROOT / "reports/demo-summary.md"
+    output.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(output)
 
 
