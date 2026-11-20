@@ -50,7 +50,8 @@ def main():
         if not args.with_locust and dashboard["uid"] == "load-generator":
             continue
         live = get_json(f"http://127.0.0.1:3000/api/dashboards/uid/{dashboard['uid']}")
-        if not live.get("meta", {}).get("provisioned"):
+        metadata = live.get("meta", {})
+        if not (metadata.get("provisioned") or metadata.get("provisionedExternalId")):
             errors.append(f"Dashboard {dashboard['uid']} is not provisioned")
         for panel in dashboard["panels"]:
             for target in panel.get("targets", []):
