@@ -12,9 +12,11 @@ function Assert-LabEnvironment {
 function Get-LabState {
     $path = Join-Path $script:Runtime 'processes.json'
     if (Test-Path -LiteralPath $path) {
-        return @(Get-Content -LiteralPath $path -Raw | ConvertFrom-Json)
+        $records = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
+        foreach ($record in $records) {
+            $record
+        }
     }
-    return @()
 }
 
 function Test-LabProcess($Record) {
