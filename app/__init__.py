@@ -1,14 +1,17 @@
-"""A deliberately small application for repeatable load-testing exercises."""
+"""Учебный интернет-магазин и метрики нагрузочного тестирования."""
 
 import math
 import os
 import random
 import time
+from uuid import uuid4
 
 import psutil
-from flask import Flask, Response, g, jsonify, render_template, request
+from flask import Flask, Response, abort, g, jsonify, render_template, request
 from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, Counter, Gauge, Histogram, generate_latest
 from prometheus_client.core import CounterMetricFamily, GaugeMetricFamily
+
+from .catalog import CATEGORIES, MAX_QUANTITY, PRODUCTS
 
 
 class ProcessMetrics:
@@ -37,6 +40,7 @@ class ProcessMetrics:
 def create_app(test_config=None):
     app = Flask(__name__)
     app.json.sort_keys = False
+    app.config["MAX_CONTENT_LENGTH"] = 16 * 1024
     if test_config:
         app.config.update(test_config)
 
@@ -90,52 +94,123 @@ def create_app(test_config=None):
             raise ValueError(f"{name}: допустимый диапазон {minimum}–{maximum}")
         return value
 
+    def quote_cart():
+        body = request.get_json(silent=True)
+        raw_items = body.get("items") if isinstance(body, dict) else None
+        if not isinstance(raw_items, list) or len(raw_items) > len(PRODUCTS):
+            raise ValueError("В JSON должен быть массив items с товарами из каталога.")
+
+        used_ids = set()
+        lines = []
+        for entry in raw_items:
+            if not isinstance(entry, dict):
+                raise ValueError("Каждая позиция должна содержать id и quantity.")
+            product_id = entry.get("id")
+            quantity = entry.get("quantity")
+            if not isinstance(product_id, str) or product_id not in PRODUCTS:
+                raise ValueError("Товар не найден в каталоге.")
+            if product_id in used_ids:
+                raise ValueError("Объедините повторяющиеся товары в одну позицию.")
+            if type(quantity) is not int or not 1 <= quantity <= MAX_QUANTITY:
+                raise ValueError(f"Количество должно быть целым числом от 1 до {MAX_QUANTITY}.")
+            used_ids.add(product_id)
+            product = PRODUCTS[product_id]
+            lines.append({
+                "id": product_id,
+                "name": product["name"],
+                "price": product["price"],
+                "quantity": quantity,
+                "subtotal": product["price"] * quantity,
+            })
+        return {
+            "items": lines,
+            "quantity": sum(line["quantity"] for line in lines),
+            "total": sum(line["subtotal"] for line in lines),
+        }
+
     @app.errorhandler(ValueError)
     def invalid_argument(error):
         return jsonify(error="invalid_parameter", message=str(error)), 400
 
     @app.errorhandler(404)
     def not_found(_error):
-        return jsonify(error="not_found", message="Маршрут не найден"), 404
+        return jsonify(error="not_found", message="Страница или товар не найдены."), 404
+
+    @app.errorhandler(413)
+    def payload_too_large(_error):
+        return jsonify(error="payload_too_large", message="Слишком большой запрос."), 413
 
     @app.get("/")
     def index():
         return render_template("index.html")
 
+    @app.get("/docs")
+    def documentation():
+        return render_template("docs.html")
+
     @app.get("/health")
     def health():
         return jsonify(status="ok", service="flask-load-lab")
 
-    @app.get("/api/fast")
-    def fast():
-        return jsonify(scenario="fast", message="Быстрый ответ без искусственной задержки")
+    @app.get("/api/categories")
+    def categories():
+        return jsonify(categories=CATEGORIES)
 
-    @app.get("/api/slow")
-    def slow():
-        delay_ms = integer_argument("delay_ms", 250, 0, 3000)
-        time.sleep(delay_ms / 1000)
-        return jsonify(scenario="slow", delay_ms=delay_ms)
+    @app.get("/api/products")
+    def products():
+        query = request.args.get("q", "").strip().casefold()
+        category = request.args.get("category", "")
+        sort = request.args.get("sort", "default")
+        delay_ms = integer_argument("delay_ms", 0, 0, 3000)
+        if len(query) > 100:
+            raise ValueError("Строка поиска должна содержать не более 100 символов.")
+        if sort not in {"default", "low", "high"}:
+            raise ValueError("sort принимает default, low или high.")
 
-    @app.get("/api/cpu")
-    def cpu():
-        iterations = integer_argument("iterations", 100000, 1000, 2000000)
-        # Pure Python intentionally demonstrates contention under the GIL.
-        checksum = 0
-        for value in range(iterations):
-            checksum = (checksum + value * value) % 1000000007
-        return jsonify(scenario="cpu", iterations=iterations, checksum=checksum)
+        matched = [
+            {"id": product_id, **product}
+            for product_id, product in PRODUCTS.items()
+            if query in product["name"].casefold()
+            and (not category or product["category"] == category)
+        ]
+        if sort != "default":
+            matched.sort(key=lambda product: product["price"], reverse=sort == "high")
+        if delay_ms:
+            time.sleep(delay_ms / 1000)
+        return jsonify(products=matched)
 
-    @app.get("/api/flaky")
-    def flaky():
+    @app.get("/api/products/<product_id>")
+    def product_detail(product_id):
+        product = PRODUCTS.get(product_id)
+        if product is None:
+            abort(404)
+        iterations = integer_argument("iterations", 0, 0, 2000000)
+        if iterations:
+            # Имитация вычислительно дорогой проверки скидок для CPU-профиля.
+            sum(value * value for value in range(iterations))
+        return jsonify(product={"id": product_id, **product})
+
+    @app.post("/api/cart")
+    def cart():
+        return jsonify(quote_cart())
+
+    @app.post("/api/orders")
+    def create_order():
+        quote = quote_cart()
+        if not quote["items"]:
+            raise ValueError("Добавьте хотя бы один товар для оформления заказа.")
         try:
-            error_rate = float(request.args.get("error_rate", "0.2"))
+            error_rate = float(request.args.get("error_rate", "0"))
         except (TypeError, ValueError):
-            raise ValueError("error_rate: требуется число от 0 до 1")
+            raise ValueError("error_rate: требуется число от 0 до 1") from None
         if not math.isfinite(error_rate) or not 0 <= error_rate <= 1:
             raise ValueError("error_rate: допустимый диапазон 0–1")
         if random.random() < error_rate:
-            return jsonify(scenario="flaky", error="simulated_failure", error_rate=error_rate), 503
-        return jsonify(scenario="flaky", status="ok", error_rate=error_rate)
+            return jsonify(
+                error="simulated_failure",
+                message="Сервис оформления заказа временно недоступен.",
+            ), 503
+        return jsonify(order_number=uuid4().hex[:12].upper(), **quote), 201
 
     @app.get("/metrics")
     def metrics():

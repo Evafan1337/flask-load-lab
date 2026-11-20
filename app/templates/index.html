@@ -3,56 +3,109 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#102c40">
-  <title>Flask Load Lab · Учебный стенд</title>
+  <title>Магазин канцтоваров</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-  <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+  <script defer src="{{ url_for('static', filename='app.js') }}"></script>
 </head>
 <body>
-  <header class="topbar">
-    <a class="brand" href="/" aria-label="Flask Load Lab — главная"><span class="brand-mark" aria-hidden="true">F<span>↗</span></span><span>FLASK <b>LOAD LAB</b></span></a>
-    <nav aria-label="Инструменты стенда">
-      <a href="http://localhost:9090" target="_blank" rel="noopener">Prometheus <span aria-hidden="true">↗</span></a>
-      <a class="nav-grafana" href="http://localhost:3000" target="_blank" rel="noopener">Открыть Grafana <span aria-hidden="true">↗</span></a>
-    </nav>
+  <header class="top">
+    <div class="shell">
+      <a class="store-name" href="#catalog">Канцтовары</a>
+      <nav class="top-nav" aria-label="Разделы магазина">
+        <a href="{{ url_for('documentation') }}">Документация</a>
+        <a class="cart-link" href="#cart">Корзина <span id="cart-count">0</span></a>
+      </nav>
+    </div>
   </header>
 
-  <main>
-    <section class="hero" aria-labelledby="page-title">
-      <div class="hero-content">
-        <p class="eyebrow"><span class="status-dot" aria-hidden="true"></span> ЛОКАЛЬНЫЙ УЧЕБНЫЙ СТЕНД</p>
-        <h1 id="page-title">Дайте нагрузку.<br><span>Увидьте причину.</span></h1>
-        <p class="intro">Четыре поведения одного Flask-приложения. Запускайте сценарии JMeter, следите за метриками в Grafana и объясняйте, что происходит с системой.</p>
-        <a class="primary-link" href="#practice">Попробовать запрос <span aria-hidden="true">↓</span></a>
-      </div>
-      <div class="flow" aria-label="JMeter отправляет запросы в Flask. Prometheus собирает метрики для Grafana">
-        <div class="flow-caption">ОТ ЗАПРОСА К НАБЛЮДЕНИЮ</div>
-        <div class="flow-row"><div class="flow-node"><span class="node-number">01</span><b>JMeter</b><small>создаёт нагрузку</small></div><span class="flow-arrow" aria-hidden="true">→</span><div class="flow-node flask-node"><span class="node-number">02</span><b>Flask</b><small>обрабатывает запросы</small></div></div>
-        <div class="flow-connector" aria-hidden="true">↓ <span>/metrics</span></div>
-        <div class="flow-row"><div class="flow-node"><span class="node-number">04</span><b>Grafana</b><small>показывает изменения</small></div><span class="flow-arrow" aria-hidden="true">←</span><div class="flow-node"><span class="node-number">03</span><b>Prometheus</b><small>сохраняет метрики</small></div></div>
-        <p class="flow-note">Сначала гипотеза. Затем нагрузка. После — вывод.</p>
-      </div>
+  <main class="shell layout">
+    <section class="catalog" id="catalog" aria-labelledby="catalog-title">
+      <h1 id="catalog-title">Товары</h1>
+      <form class="controls" id="filters" role="search" aria-label="Поиск товаров">
+        <label class="field">
+          <span>Поиск</span>
+          <input id="search" type="search" placeholder="Название товара" autocomplete="off" maxlength="100">
+        </label>
+        <label class="field">
+          <span>Категория</span>
+          <select id="category">
+            <option value="">Все категории</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Сортировка</span>
+          <select id="sort">
+            <option value="default">По умолчанию</option>
+            <option value="low">Сначала дешевле</option>
+            <option value="high">Сначала дороже</option>
+          </select>
+        </label>
+      </form>
+      <p id="results-count" class="results" aria-live="polite">Загрузка товаров…</p>
+      <ul id="products" class="products"></ul>
     </section>
 
-    <section class="signals" aria-label="Три главных сигнала">
-      <article><span class="signal-code">RPS</span><div><h2>Сколько успевает?</h2><p>Число завершённых запросов в секунду.</p></div></article>
-      <article><span class="signal-code">p95</span><div><h2>Как долго ждут?</h2><p>95% запросов укладываются в это время.</p></div></article>
-      <article><span class="signal-code">5xx</span><div><h2>Как часто ошибается?</h2><p>Доля запросов с серверной ошибкой.</p></div></article>
-    </section>
-
-    <section class="practice" id="practice" aria-labelledby="practice-title">
-      <div class="section-title"><div><p class="eyebrow">01 / ПОВЕДЕНИЕ ПРИЛОЖЕНИЯ</p><h2 id="practice-title">Один запрос — одна гипотеза</h2></div><p>Кнопки отправляют по одному запросу.<br>Параллельные запросы запускайте в JMeter.</p></div>
-      <div class="scenarios">
-        <article class="scenario"><span class="scenario-kind kind-fast">БАЗОВАЯ ЛИНИЯ</span><h3>Быстрый ответ</h3><p>Минимальная работа обработчика. Отправная точка для сравнения сценариев.</p><code>GET /api/fast</code><div class="scenario-bottom"><span>Наблюдайте: RPS</span><button type="button" data-url="/api/fast" data-label="Быстрый ответ">Отправить <span aria-hidden="true">↗</span></button></div></article>
-        <article class="scenario"><span class="scenario-kind kind-slow">ОЖИДАНИЕ</span><h3>Медленный ответ</h3><p>Поток ждёт 500 мс. При росте нагрузки свободные потоки заканчиваются.</p><code>GET /api/slow?delay_ms=500</code><div class="scenario-bottom"><span>Наблюдайте: p95</span><button type="button" data-url="/api/slow?delay_ms=500" data-label="Медленный ответ">Отправить <span aria-hidden="true">↗</span></button></div></article>
-        <article class="scenario"><span class="scenario-kind kind-cpu">ВЫЧИСЛЕНИЯ</span><h3>Занятый процессор</h3><p>Цикл на чистом Python. Сравните загрузку CPU и время ответа при конкуренции.</p><code>GET /api/cpu?iterations=1000000</code><div class="scenario-bottom"><span>Наблюдайте: CPU</span><button type="button" data-url="/api/cpu?iterations=1000000" data-label="Занятый процессор">Отправить <span aria-hidden="true">↗</span></button></div></article>
-        <article class="scenario"><span class="scenario-kind kind-error">ОШИБКИ</span><h3>Нестабильный ответ</h3><p>Каждый запрос с вероятностью 20% получает 503. Малые выборки могут отличаться.</p><code>GET /api/flaky?error_rate=0.2</code><div class="scenario-bottom"><span>Наблюдайте: 5xx</span><button type="button" data-url="/api/flaky?error_rate=0.2" data-label="Нестабильный ответ">Отправить <span aria-hidden="true">↗</span></button></div></article>
+    <aside class="cart" id="cart" aria-labelledby="cart-title">
+      <h2 id="cart-title" tabindex="-1">Корзина</h2>
+      <ul id="cart-items" class="cart-items"></ul>
+      <p id="cart-empty" class="empty">Корзина пуста.</p>
+      <div id="cart-summary" class="summary" hidden>
+        <span>Итого</span>
+        <strong id="cart-total">0 ₽</strong>
       </div>
-      <div class="response-panel" aria-live="polite" aria-atomic="true"><div class="response-header"><span><span class="terminal-dot" aria-hidden="true"></span> РЕЗУЛЬТАТ ЗАПРОСА</span><span id="response-meta">Готов к проверке</span></div><pre id="response-body">Нажмите «Отправить», чтобы увидеть HTTP-статус, время и JSON-ответ.</pre></div>
-    </section>
-
-    <section class="lesson" aria-labelledby="lesson-title"><div><p class="eyebrow">02 / ЭКСПЕРИМЕНТ</p><h2 id="lesson-title">Увеличивайте нагрузку<br>по одному параметру</h2></div><ol><li><b>Снимите базовую линию</b><span>В JMeter откройте план load.jmx и начните с небольшого числа пользователей.</span></li><li><b>Добавьте задержку или вычисления</b><span>Повторите тест с тем же числом пользователей. Сравните RPS, p95 и CPU.</span></li><li><b>Объясните предел</b><span>Увеличьте пользователей. Найдите точку, где время растёт, а RPS почти не меняется.</span></li></ol></section>
+      <button id="checkout" class="primary checkout" type="button" hidden>Оформить заказ</button>
+      <p id="cart-error" class="message-error" role="alert"></p>
+      <p id="receipt" class="receipt" role="status" hidden></p>
+    </aside>
   </main>
-  <footer><span>Flask Load Lab <b>·</b> Учимся на наблюдениях</span><span><a href="/health" target="_blank" rel="noopener">Health</a><a href="/metrics" target="_blank" rel="noopener">Метрики</a><span>Задержка ≤ 3 с · CPU ≤ 2 млн итераций</span></span></footer>
+
+  <p id="cart-status" class="sr-only" role="status"></p>
+
+  <dialog id="order-dialog" aria-labelledby="order-title" aria-describedby="order-note">
+    <h2 id="order-title">Подтверждение заказа</h2>
+    <p id="order-note">Номер и сумма демо-заказа сохраняются в браузере.</p>
+    <ul class="order-items" id="order-items"></ul>
+    <div class="summary"><span>Итого</span><strong id="order-total"></strong></div>
+    <p id="order-error" class="message-error" role="alert"></p>
+    <form id="order-form" class="dialog-actions" method="dialog">
+      <button id="order-cancel" class="secondary" value="cancel" autofocus>Отмена</button>
+      <button id="order-confirm" class="primary" value="confirm">Подтвердить</button>
+    </form>
+  </dialog>
+
+  <dialog id="product-dialog" aria-labelledby="product-title">
+    <h2 id="product-title"></h2>
+    <p id="product-description"></p>
+    <div class="summary"><span>Цена</span><strong id="product-price"></strong></div>
+    <form class="dialog-actions" method="dialog">
+      <button class="secondary" autofocus>Закрыть</button>
+    </form>
+  </dialog>
+
+  <template id="product-template">
+    <li class="product">
+      <div class="product-details">
+        <h2><button class="product-name" type="button" data-detail></button></h2>
+        <p class="category"></p>
+      </div>
+      <strong class="product-price"></strong>
+      <button class="primary" type="button">В корзину</button>
+    </li>
+  </template>
+
+  <template id="cart-template">
+    <li class="cart-row">
+      <div class="item-text"><h3></h3><p></p></div>
+      <div class="qty">
+        <button class="icon-button" type="button" data-change="-1">−</button>
+        <span></span>
+        <button class="icon-button" type="button" data-change="1">+</button>
+      </div>
+      <strong class="line-total"></strong>
+      <button class="remove" type="button" data-remove>Удалить</button>
+    </li>
+  </template>
+
+  <noscript>Для работы корзины включите JavaScript.</noscript>
 </body>
 </html>

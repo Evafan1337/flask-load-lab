@@ -26,3 +26,83 @@ jobs:
       - name: Stop the lab
         if: always()
         run: docker compose down
+      - name: Save the JMeter report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jmeter-docker-smoke
+          path: reports/jmeter-smoke-*/
+          if-no-files-found: ignore
+
+  native-windows:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - run: python -m pip install -r requirements-lock.txt
+      - run: python -m pytest -q
+      - name: Install JMeter 5.6.3
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'apache-jmeter-5.6.3.tgz'
+          curl.exe -fSL --connect-timeout 15 "https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-5.6.3.tgz" -o $archive
+          if ($LASTEXITCODE -ne 0) {
+            curl.exe -fSL --connect-timeout 15 "https://dlcdn.apache.org/jmeter/binaries/apache-jmeter-5.6.3.tgz" -o $archive
+            if ($LASTEXITCODE -ne 0) { throw 'Could not download JMeter' }
+          }
+          $expected = '5978a1a35edb5a7d428e270564ff49d2b1b257a65e17a759d259a9283fc17093e522fe46f474a043864aea6910683486340706d745fcdf3db1505fd71e689083'
+          if ((Get-FileHash -Algorithm SHA512 $archive).Hash -ne $expected) { throw 'JMeter checksum mismatch' }
+          tar.exe -xzf $archive -C $env:RUNNER_TEMP
+          if ($LASTEXITCODE -ne 0) { throw 'Could not unpack JMeter' }
+      - name: Start Flask and run JMeter natively
+        shell: pwsh
+        run: |
+          $out = New-Item -ItemType Directory -Force 'reports/ci-windows'
+          $server = Start-Process -FilePath (Get-Command python).Source -ArgumentList @('-m', 'app') -PassThru `
+            -RedirectStandardOutput (Join-Path $out.FullName 'flask.log') `
+            -RedirectStandardError (Join-Path $out.FullName 'flask-error.log')
+          try {
+            $ready = $false
+            for ($attempt = 0; $attempt -lt 30; $attempt++) {
+              try {
+                if ((Invoke-RestMethod 'http://127.0.0.1:5000/health' -TimeoutSec 2).status -eq 'ok') {
+                  $ready = $true
+                  break
+                }
+              } catch {
+                Start-Sleep -Milliseconds 500
+              }
+              if ($server.HasExited) { throw 'Flask exited during startup' }
+            }
+            if (!$ready) { throw 'Flask did not start' }
+            $jmeter = Join-Path $env:RUNNER_TEMP 'apache-jmeter-5.6.3/bin/jmeter.bat'
+            $results = Join-Path $out.FullName 'results.jtl'
+            & $jmeter -n -t jmeter/smoke.jmx -l $results -j (Join-Path $out.FullName 'jmeter.log') `
+              -e -o (Join-Path $out.FullName 'html')
+            if ($LASTEXITCODE -ne 0) { throw 'JMeter returned an error' }
+            $samples = @(Import-Csv -LiteralPath $results)
+            if ($samples.Count -ne 6 -or @($samples | Where-Object success -ne 'true').Count -gt 0 -or
+                @($samples | Where-Object responseCode -eq '200').Count -ne 5 -or
+                @($samples | Where-Object responseCode -eq '201').Count -ne 1 -or
+                !(Test-Path (Join-Path $out.FullName 'html/index.html'))) {
+              throw 'Expected six successful samples and an HTML report'
+            }
+            $samples | Format-Table label,responseCode,success
+          } finally {
+            if (!$server.HasExited) { Stop-Process -Id $server.Id }
+          }
+      - name: Save the native Windows report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jmeter-native-windows
+          path: reports/ci-windows/
+          if-no-files-found: ignore

@@ -1,136 +1,88 @@
-# Дополнительная практика с Locust
+# Windows и дополнительная практика с Locust
 
-Готовая учебная лаборатория нагрузочного тестирования: **Flask + Waitress → Locust → Prometheus → Grafana**. Интерфейс приложения, два дашборда и практикум — на русском. Ручное создание источников данных и импорт панелей не нужны.
+Основной сценарий занятия использует [JMeter](lesson.md). Locust можно запустить для сравнения клиентских метрик магазина в реальном времени.
 
-## Адреса сервисов
+## Нативный запуск в Windows
 
-| Что открыть | Адрес |
-|---|---|
-| Учебное приложение | [127.0.0.1:5000](http://127.0.0.1:5000/) |
-| Управление нагрузкой Locust | [127.0.0.1:8089](http://127.0.0.1:8089/) |
-| Grafana: сервер Flask | [Дашборд Flask](http://127.0.0.1:3000/d/flask-load-lab) |
-| Grafana: результаты Locust | [Дашборд Locust](http://127.0.0.1:3000/d/load-generator) |
-| Сбор метрик | [Prometheus targets](http://127.0.0.1:9090/targets) |
-
-Grafana доступна для просмотра без входа. Для необязательного редактирования администратором локальные реквизиты находятся в `.runtime/credentials.json` (в Git не попадают). Сохранённые результаты и ссылки на демонстрацию — в [DEMO-RESULTS.md](../DEMO-RESULTS.md).
-
-## Запуск в Windows
-
-После установки окружения откройте PowerShell в корне репозитория:
-
-```powershell
-.\scripts\Start-Lab.ps1
-# Повторный вызов показывает состояние уже работающего стенда.
-.\scripts\Status-Lab.ps1
-```
-
-На новом компьютере сначала выполните:
+Откройте PowerShell в корне проекта и выполните следующие команды.
 
 ```powershell
 .\scripts\Setup-Windows.ps1
 .\scripts\Start-Lab.ps1 -OpenBrowser
+.\scripts\Status-Lab.ps1
 ```
 
-Установщик загружает закреплённые версии uv, CPython, Prometheus и Grafana с официальных сайтов, сверяет SHA256 и размещает всё **внутри проекта**. Системный Python, PATH и службы Windows менять не нужно. Первое скачивание — около 650 МБ; распакованному окружению требуется несколько ГБ. Нужны Windows x64, доступ в интернет, `curl.exe` и `tar.exe` (входят в современные Windows).
+Для установки нужны Windows x64, доступ в интернет, `curl.exe` и `tar.exe`. Скрипт сверяет SHA256 закреплённых архивов uv, CPython, Prometheus и Grafana и устанавливает инструменты в каталог проекта. Распакованное окружение требует несколько ГБ.
 
-Если PowerShell запрещает выполнение скрипта, можно запустить его в отдельном процессе без изменения постоянной политики:
+При ошибке политики выполнения запустите скрипт в отдельном процессе PowerShell. Этот режим действует во время запуска команды.
 
 ```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Setup-Windows.ps1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Start-Lab.ps1
 ```
 
-Если SOCKS-прокси мешает uv загрузить зависимости, используйте `Setup-Windows.ps1 -DirectNetwork`. Флаг временно задаёт `NO_PROXY=*` для загрузки Python-зависимостей.
+При проблеме с SOCKS-прокси для загрузки Python-зависимостей запустите `Setup-Windows.ps1 -DirectNetwork`. Установщик восстановит переменную `NO_PROXY` после загрузки.
 
-Остановить стенд:
+| Сервис | Адрес |
+| --- | --- |
+| Каталог и корзина | [Магазин](http://127.0.0.1:5000/) |
+| Справка по API | [Документация](http://127.0.0.1:5000/docs) |
+| Выбор сценария Locust | [Locust](http://127.0.0.1:8089/) |
+| Серверные метрики | [Grafana магазина](http://127.0.0.1:3000/d/flask-load-lab) |
+| Клиентские метрики | [Grafana Locust](http://127.0.0.1:3000/d/load-generator) |
+| Состояние сбора | [Цели Prometheus](http://127.0.0.1:9090/targets) |
+
+Просмотр Grafana доступен без входа. Реквизиты администратора хранятся в локальном файле `.runtime/credentials.json`. Повторный запуск `Start-Lab.ps1` показывает состояние работающего стенда. Остановка сохраняет историю метрик.
 
 ```powershell
 .\scripts\Stop-Lab.ps1
 ```
 
-Остановка сохраняет историю Prometheus и Grafana. Скрипт останавливает процессы только из этой папки, сверяя PID и время создания. Автозапуск после перезагрузки не установлен: снова выполните `Start-Lab.ps1`. Не переносите папку с работающими процессами; после переноса исходников создайте окружение заново.
+## Сценарии магазина
 
-## Первый урок
+| Сценарий | Запрос | Что измерять |
+| --- | --- | --- |
+| `baseline` | `GET /api/products` | RPS и задержку каталога |
+| `slow` | `GET /api/products?delay_ms=250` | Задержку каталога и RPS при том же числе покупателей |
+| `errors` | `POST /api/orders?error_rate=0.15` | Успешные 201 и ожидаемые 503 на демо-заказах |
+| `cpu` | `GET /api/products/notebook?iterations=100000` | Задержку карточки и CPU процесса |
+| `mixed` | Смесь сценариев с весами 8:2:1:1 | Вклад отдельных маршрутов в общие показатели |
 
-1. Откройте приложение, затем Locust и оба дашборда Grafana.
-2. В Locust используйте `http://127.0.0.1:5000` для нативного запуска в Windows или `http://flask:5000` для Docker. Настройки: Users `10`, Spawn rate `2`, `lab-scenario` = `baseline`. Запустите на минуту и остановите.
-3. Повторите со сценарием `slow`, затем `errors`. В Grafana сравните RPS, p95 и долю ошибок.
-4. Выполните задания [практикума на 50–60 минут](locust-lesson.md). Для преподавателя есть [памятка и ожидаемые наблюдения](instructor.md).
+В интерфейсе Locust выберите 10 пользователей, скорость запуска 2 пользователя в секунду и нужный `lab-scenario`. Цель для Windows — `http://127.0.0.1:5000`, для Docker — `http://flask:5000`. Детали экспериментов есть в [практикуме Locust](locust-lesson.md).
 
-Для автоматического запуска с HTML и CSV:
+Для автоматического прогона на Windows воспользуйтесь сценариями PowerShell.
 
 ```powershell
 .\scripts\Run-LoadTest.ps1 -Scenario baseline -Users 10 -Duration 60s
 .\scripts\Run-LoadTest.ps1 -Scenario slow -DelayMs 250 -Users 10 -Duration 60s
 .\scripts\Run-LoadTest.ps1 -Scenario errors -ErrorRate 0.15 -Users 10 -Duration 60s
-# Все три последовательно + comparison.json:
 .\scripts\Run-Demo.ps1
 ```
 
-Каждый запуск сохраняет `report.html`, CSV, параметры и сводку `run.json` в `reports/<UTC-время>-<сценарий>/`. Обёртка принимает 1–100 пользователей, 10 секунд — 5 минут и фиксированный localhost. Ошибки HTTP записываются в отчёт; обёртка не применяет пороги SLO и не считает намеренные 503 сбоем инфраструктуры. При запуске Locust напрямую его обычный ненулевой код при ошибках сохраняется.
+Каждый прогон сохраняет HTML, CSV и `run.json` в `reports/<UTC-время>-<сценарий>/`. `Run-Demo.ps1` повторяет три запуска подряд и составляет сводку. Скрипт принимает 1–100 пользователей и длительность от 10 секунд до 5 минут. Для профиля заказов смотрите на `failures` и HTTP-коды в отчёте, даже если команда завершилась успешно.
 
-В интерактивном Locust профиль выбирается перед каждым тестом. Один активный генератор за раз даёт понятное сравнение. Автоматический прогон использует exporter на 9647, интерактивный — 9646. На дашборде Locust выберите `locust_headless`, `locust` или All. Неактивный headless exporter в Prometheus имеет `up=0` — это ожидаемо.
+## Запуск Locust в Docker
 
-## Учебные сценарии
+Сначала остановите нативный стенд. Запустите профиль Locust вместе с магазином и мониторингом.
 
-| Сценарий | Маршрут | Что наблюдать |
-|---|---|---|
-| `baseline` | `/api/fast` | Базовое время ответа и RPS |
-| `slow` | `/api/slow?delay_ms=250` | Задержка без обязательного роста CPU; очередь при нехватке потоков |
-| `errors` | `/api/flaky?error_rate=0.15` | Примерно 15% HTTP 503 на достаточно большой выборке |
-| `cpu` | `/api/cpu?iterations=100000` | Вычисления на запрос; зависимость от компьютера |
-| `mixed` | Смесь 8:2:1:1 | Почему нужно смотреть каждый endpoint отдельно |
-
-Flask обслуживается одним процессом Waitress с 8 потоками, debug выключен. Параметры запросов ограничены. Метрики не включают query-параметры и произвольные URL в labels. `/metrics` не засоряет статистику пользовательских запросов.
-
-Flask histogram измеряет время внутри обработчика. Locust измеряет время со стороны клиента, включая ожидание в очереди. Серверный p95 оценивается по buckets в скользящем окне; клиентский p95 считается по статистике текущего теста. Это разные измерения. Подробнее — [контракт метрик](locust-metrics.md) и [разбор дашбордов](../observability/sources.md).
-
-## Docker Compose
-
-Вариант для компьютера с запущенным Docker Engine/Desktop:
-
-```powershell
-docker compose --profile locust up --build -d
+```sh
+docker compose --profile locust up --build -d --wait
 docker compose ps
-docker compose logs -f
-# Остановить, сохранив volumes:
+docker compose run --rm --use-aliases loadtest
 docker compose --profile locust down
 ```
 
-Перед запуском Docker остановите нативный стенд: порты совпадают. Адреса страниц те же. Grafana provisioned автоматически, данные сохраняются в именованных volumes. Пароль администратора для Docker задаётся в `.env`, пример — `.env.example`; просмотр работает без входа. Все опубликованные порты привязаны к 127.0.0.1.
+Параметр `--use-aliases` позволяет Prometheus находить временный генератор по имени `loadtest`. В Linux можно выставить `LOCAL_UID` и `LOCAL_GID` в `.env` для записи отчёта от имени своего пользователя. Пример переменных есть в `.env.example`.
 
-Автоматический Docker-прогон (службы стенда должны работать):
+## Проверка и метрики
 
-```powershell
-docker compose run --rm --use-aliases loadtest
-# Свои параметры, все аргументы после имени сервиса заменяют command:
-docker compose run --rm --use-aliases loadtest --headless --lab-scenario slow -u 10 -r 2 -t 60s --csv /srv/flask-load-lab/reports/docker-slow --html /srv/flask-load-lab/reports/docker-slow.html
-```
-
-`--use-aliases` позволяет Prometheus найти временный генератор по имени `loadtest`. Для Linux задайте `LOCAL_UID`/`LOCAL_GID` по результатам `id -u`/`id -g`, чтобы отчёты в bind mount принадлежали вашему пользователю. По умолчанию — 1000:1000. Одновременные headless-прогоны в этой учебной конфигурации не предусмотрены.
-
-## Проверка и разработка
+После запуска нативного стенда выполните проверки через PowerShell.
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -q
 .\.venv\Scripts\python.exe scripts/check_lab.py --with-locust
-docker compose config --quiet
-.\.runtime\prometheus\prometheus-3.16.0.windows-amd64\promtool.exe check config observability/prometheus.yml
 ```
 
-Основные версии: Python 3.13.18, Flask 3.1.3, Waitress 3.0.2, Locust 2.47.0, prometheus-client 0.26.0, Prometheus 3.16.0, Grafana 13.3.1. Прямые зависимости — `requirements*.txt`, общая фиксация транзитивных версий Windows/Linux — `requirements-lock.txt`. Обновляйте lock осознанно после проверки:
+В Prometheus выберите цель `locust` для браузерного генератора и `locust_headless` для отдельного запуска. Неактивный headless отображается как DOWN между тестами. Смотрите логи запуска в `.runtime/logs/`. Для сравнения выбирайте одинаковые временные интервалы и запускайте по одному генератору.
 
-```powershell
-.\.runtime\uv\uv.exe pip compile --universal --python-version 3.13 requirements-dev.txt requirements-load.txt -o requirements-lock.txt
-```
-
-Файлы: `app/` — приложение; `load_tests/` — сценарии и exporter; `observability/` — Prometheus, Grafana и источники примеров; `scripts/` — запуск и отчёты; `docs/` — материалы урока; `.github/workflows/checks.yml` — проверки в GitHub Actions.
-
-В исходниках подготовлены собственные дашборды с современными встроенными панелями. В каталоге Grafana найдены и разобраны примеры [Locust 11985](https://grafana.com/grafana/dashboards/11985-locust-test/), [Flask 16111](https://grafana.com/grafana/dashboards/16111-flask-monitoring/) и [Flask exporter 17629](https://grafana.com/grafana/dashboards/17629-prometheus-flask-exporter-dashboard/). Они используют разные exporters, поэтому их запросы адаптированы к явному контракту нашей лаборатории; сторонние JSON целиком не копируются.
-
-## Если что-то не открывается
-
-- Проверьте `Status-Lab.ps1`, затем `.runtime/logs/<сервис>.err.log` и `.out.log`.
-- При занятом порте скрипт завершится с указанием номера; он не останавливает чужие службы.
-- При первом старте Grafana выполняет миграции и может запускаться дольше минуты.
-- Для графиков нужны хотя бы два scrape и реальная нагрузка. Установите диапазон последних 15 минут и обновление 5 секунд либо используйте фиксированные ссылки из `DEMO-RESULTS.md`.
-- После выключения компьютера выполните `Start-Lab.ps1`; данные сохраняются 7 дней с ограничением Prometheus 1 ГБ.
+Flask обслуживает запросы через Waitress с восемью потоками. Flask измеряет время в приложении по гистограмме, Locust — со стороны клиента. [Контракт метрик Locust](locust-metrics.md) · [Обзор дашбордов](../observability/sources.md)

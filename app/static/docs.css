@@ -1,0 +1,28 @@
+.docs-layout {
+  display: grid;
+  grid-template-columns: 11rem minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+  padding-block: 1.5rem 2rem;
+}
+.docs-nav, .doc { border: 1px solid var(--border); border-radius: .5rem; background: var(--surface); }
+.docs-nav { display: grid; padding: .5rem; }
+.docs-nav a { padding: .5rem; color: var(--primary); }
+.doc { min-width: 0; padding: 1.25rem; }
+.doc h2 { margin-bottom: .5rem; }
+.doc section { margin-top: 1.5rem; scroll-margin-top: 1rem; }
+.doc p + p { margin-top: .5rem; }
+.doc ol { margin: 0; padding-inline-start: 1.4rem; }
+.doc li + li { margin-top: .35rem; }
+.doc a { color: var(--primary); }
+.table-scroll { overflow-x: auto; }
+.doc table { width: 100%; border-collapse: collapse; text-align: left; }
+.doc th, .doc td { padding: .5rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+.doc th { font-weight: 650; }
+.doc td:nth-child(2) { white-space: nowrap; }
+.doc pre { padding: .75rem; overflow-x: auto; background: #f5f6f8; border: 1px solid var(--border); }
+@media (max-width: 40rem) {
+  .docs-layout { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+  .docs-nav { display: flex; flex-wrap: wrap; }
+  .doc { padding: 1rem; }
+}

@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Документация магазина</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='docs.css') }}">
+</head>
+<body>
+  <header class="top">
+    <div class="shell">
+      <a class="store-name" href="{{ url_for('index') }}">Канцтовары</a>
+      <a class="cart-link" href="{{ url_for('index') }}">В магазин</a>
+    </div>
+  </header>
+  <main class="shell docs-layout">
+    <nav class="docs-nav" aria-label="Содержание документации">
+      <a href="#flow">Покупка</a>
+      <a href="#api">Маршруты API</a>
+      <a href="#cart-example">Пример корзины</a>
+      <a href="#jmeter">Планы JMeter</a>
+      <a href="#metrics">Метрики</a>
+    </nav>
+
+    <article class="doc">
+      <h1>Документация магазина</h1>
+
+      <section id="flow">
+        <h2>Покупка</h2>
+        <ol>
+          <li>Найдите товар по названию или категории. Нажмите на название, чтобы открыть карточку.</li>
+          <li>Добавьте товары в корзину и измените количество. Flask проверяет цены при оформлении.</li>
+          <li>Подтвердите демо-заказ. Браузер сохранит его номер и сумму.</li>
+        </ol>
+      </section>
+
+      <section id="api">
+        <h2>Маршруты API</h2>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th scope="col">Метод</th><th scope="col">Путь</th><th scope="col">Результат</th></tr></thead>
+            <tbody>
+              <tr><td>GET</td><td><a href="{{ url_for('categories') }}">/api/categories</a></td><td>Категории товаров</td></tr>
+              <tr><td>GET</td><td><a href="{{ url_for('products') }}">/api/products</a></td><td>Каталог с параметрами <code>q</code>, <code>category</code> и <code>sort</code> (<code>default</code>, <code>low</code>, <code>high</code>)</td></tr>
+              <tr><td>GET</td><td><a href="{{ url_for('product_detail', product_id='notebook') }}">/api/products/notebook</a></td><td>Карточка товара по идентификатору</td></tr>
+              <tr><td>POST</td><td><code>/api/cart</code></td><td>Проверка позиций и расчёт стоимости</td></tr>
+              <tr><td>POST</td><td><code>/api/orders</code></td><td>Демо-заказ. Ответ 201 содержит номер заказа и сумму</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="cart-example">
+        <h2>Пример корзины</h2>
+        <p>Оба POST-маршрута принимают JSON с позициями. Количество на позицию — от 1 до 99. Две тетради стоят 158 ₽.</p>
+        <pre><code>{"items":[{"id":"notebook","quantity":2}]}</code></pre>
+      </section>
+
+      <section id="jmeter">
+        <h2>Планы JMeter</h2>
+        <p><code>smoke.jmx</code> проверяет путь от каталога до заказа. <code>load.jmx</code> позволяет менять число пользователей, длительность, метод и путь запроса.</p>
+        <p>Параметр каталога <code>delay_ms=250</code> добавляет задержку. Параметр заказа <code>error_rate=0.15</code> включает демонстрационные ответы 503.</p>
+      </section>
+
+      <section id="metrics">
+        <h2>Метрики</h2>
+        <p>Prometheus читает <a href="{{ url_for('metrics') }}">/metrics</a>. В Grafana сравните RPS, p95 и долю ответов 5xx для каталога и оформления заказа. <a href="{{ url_for('health') }}">Проверка Flask</a>.</p>
+      </section>
+    </article>
+  </main>
+</body>
+</html>

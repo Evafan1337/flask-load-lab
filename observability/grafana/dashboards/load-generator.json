@@ -1,7 +1,7 @@
 {
   "id": null,
   "uid": "load-generator",
-  "title": "02 · Locust — пользователи и результаты",
+  "title": "02 · Магазин — генератор Locust",
   "description": "Клиентская сторона теста: пользователи, RPS, failures и накопленные процентили Locust.",
   "version": 1,
   "schemaVersion": 39,
@@ -650,7 +650,7 @@
     {
       "id": 9,
       "title": "Ошибки/с по сценарию",
-      "description": "Намеренные ошибки /api/flaky ожидаемы в соответствующем сценарии. Нулевые значения не доказывают соблюдение latency SLO.",
+      "description": "HTTP 503 при оформлении заказа ожидаемы в сценарии errors.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",

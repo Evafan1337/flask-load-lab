@@ -30,6 +30,7 @@ def bounded_env(name, default, minimum, maximum, converter=int):
 DELAY_MS = bounded_env("LAB_DELAY_MS", 250, 0, 2000)
 ERROR_RATE = bounded_env("LAB_ERROR_RATE", 0.15, 0, 1, float)
 CPU_ITERATIONS = bounded_env("LAB_CPU_ITERATIONS", 100000, 1000, 1000000)
+DEMO_CART = {"items": [{"id": "notebook", "quantity": 2}]}
 _metrics_server = None
 
 
@@ -98,11 +99,20 @@ class LabUser(HttpUser):
             )[0]
         timeout = (2, 5)
         if scenario == "baseline":
-            self.client.get("/api/fast", name="/api/fast", timeout=timeout)
+            self.client.get("/api/products", name="/api/products", timeout=timeout)
         elif scenario == "slow":
-            self.client.get(f"/api/slow?delay_ms={DELAY_MS}", name="/api/slow", timeout=timeout)
+            self.client.get(
+                "/api/products", params={"delay_ms": DELAY_MS},
+                name="/api/products", timeout=timeout,
+            )
         elif scenario == "errors":
             # 503 responses intentionally count as failures in Locust and Grafana.
-            self.client.get(f"/api/flaky?error_rate={ERROR_RATE}", name="/api/flaky", timeout=timeout)
+            self.client.post(
+                "/api/orders", params={"error_rate": ERROR_RATE}, json=DEMO_CART,
+                name="/api/orders", timeout=timeout,
+            )
         elif scenario == "cpu":
-            self.client.get(f"/api/cpu?iterations={CPU_ITERATIONS}", name="/api/cpu", timeout=timeout)
+            self.client.get(
+                "/api/products/notebook", params={"iterations": CPU_ITERATIONS},
+                name="/api/products/<product_id>", timeout=timeout,
+            )

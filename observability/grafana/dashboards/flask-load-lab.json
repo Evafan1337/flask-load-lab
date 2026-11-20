@@ -1,7 +1,7 @@
 {
   "id": null,
   "uid": "flask-load-lab",
-  "title": "01 · Flask — нагрузка и качество",
+  "title": "01 · Магазин — нагрузка и качество",
   "description": "Учебный RED dashboard: throughput, 5xx, latency, inflight, CPU и память Flask.",
   "version": 1,
   "schemaVersion": 39,
@@ -55,7 +55,7 @@
     "list": [
       {
         "name": "endpoint",
-        "label": "API endpoint",
+        "label": "Путь API",
         "type": "query",
         "datasource": {
           "type": "prometheus",
@@ -115,7 +115,7 @@
   "panels": [
     {
       "id": 1,
-      "title": "Лаборатория · производительность Flask",
+      "title": "Каталог и заказы",
       "type": "text",
       "gridPos": {
         "x": 0,
@@ -125,7 +125,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "**RED:** Rate — запросы в секунду; Errors — доля HTTP 5xx; Duration — время ответа. Запустите Locust, сравните `/api/fast`, `/api/slow`, `/api/cpu`, `/api/flaky`. Фильтр сверху меняет API-метрики. **p95** означает: около 95% запросов быстрее этого времени. При отсутствии трафика процентили пустые; нужно минимум два scrape (около 10 секунд). Это учебные ориентиры SLO, а не универсальные требования."
+        "content": "**RPS** — завершённые запросы в секунду. **5xx** — доля серверных ошибок. **p95** — время, в которое уложились около 95% запросов. В JMeter сравните GET `/api/products`, каталог с `delay_ms=250` и POST `/api/orders` с имитацией 503. Фильтр «Путь API» меняет показанные маршруты. Для графиков нужно несколько сборов Prometheus."
       }
     },
     {
@@ -402,7 +402,7 @@
     },
     {
       "id": 6,
-      "title": "RPS по endpoint",
+      "title": "RPS по маршрутам магазина",
       "description": "Сравните состав нагрузки и распределение завершённых запросов.",
       "type": "timeseries",
       "datasource": {
@@ -583,7 +583,7 @@
     {
       "id": 8,
       "title": "Ошибки 5xx во времени",
-      "description": "Доля завершённых запросов, на которые Flask ответил 5xx. /api/flaky намеренно создаёт ошибки.",
+      "description": "Доля завершённых запросов с HTTP 5xx. Профиль оформления заказа может намеренно возвращать HTTP 503.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -741,7 +741,7 @@
     {
       "id": 10,
       "title": "HTTP-статусы · запросы/с",
-      "description": "5xx — серверные ошибки; 4xx — некорректные параметры или маршрут. 4xx не включены в показатель 5xx сверху.",
+      "description": "201 — демо-заказ оформлен. 4xx — ошибки запроса. 5xx — серверный сбой или демонстрационный ответ 503.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -820,7 +820,7 @@
     {
       "id": 11,
       "title": "Среднее и p95 по endpoint",
-      "description": "Среднее и p95 на стороне сервера. Locust измеряет время со стороны клиента, включая ожидание соединения и сеть.",
+      "description": "Среднее и p95 на стороне Flask. JMeter измеряет весь запрос с точки зрения клиента, включая ожидание соединения.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
